@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MUX</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inconsolata', monospace;
+            background-color: #000;
+            color: #ccc;
+            margin: 0;
+            padding: 20px;
+        }
+        #container {
+            margin: auto;
+            width: 80%;
+        }
+        .row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .row input[type="text"] {
+            width: 230px;
+            margin-right: 5px;
+            padding: 5px;
+            background-color: #222;
+            border: 1px solid #555;
+            border-radius: 3px;
+            color: #ccc;
+            font-family: 'Inconsolata', monospace;
+        }
+        .dayz {
+            width: 12px;
+            font-size: 10px;
+            background-color: #000;
+            color: #354b60;
+            border: 1px solid #000;
+            font-family: 'Inconsolata', monospace;
+        }
+    
+        .dayz::placeholder {
+            color: #354b60; /* Example color */
+        }
+    
+        .middle-column {
+            width: 37px;
+            text-align: left;
+            padding: 5px;
+            background-color: #000;
+            color: #354b60;
+            border: 1px solid #000;
+            border-radius: 3px;
+            font-family: 'Inconsolata', monospace;
+        }
+        .value {
+            width: 30px;
+            text-align: left;
+            padding: 5px;
+            background-color: #222;
+            color: #ccc;
+            border: 1px solid #555;
+            border-radius: 3px;
+            font-family: 'Inconsolata', monospace;
+        }
+        .add {
+            width: 30px;
+            text-align: center;
+            padding: 5px;
+            background-color: #1c1c1c;
+            color: #ccc;
+            border: 1px solid #333;
+            border-radius: 3px;
+            font-family: 'Inconsolata', monospace;
+        }
+        #refresh-button {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background-color: #3B342B;
+            color: #a0a0a0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Inconsolata', monospace;
+        }
+        #undo-button {
+            display: inline-block;
+            margin-bottom: 20px;
+            margin-left: 10px;
+            padding: 10px 20px;
+            background-color: #1E1D1B; /* Slightly darker than refresh */
+            color: #a0a0a0;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: 'Inconsolata', monospace;
+        }
+        #star-count {
+            margin-top: 10px;
+            color: #444;
+            font-family: 'Inconsolata', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <button id="refresh-button">Refresh</button>
+        <button id="undo-button">↩</button>
+        <span id="star-count" style="color: #444; font-family: 'Inconsolata', monospace; margin-left: 10px;">*** Count: 0</span>
+        <div id="rows-container"></div>
+        <audio id="refresh-sound" src="refresh.mp3"></audio>
+        <audio id="click-sound" src="click_sound.mp3"></audio>
+        <audio id="blip-sound" src="blip.mp3"></audio>
+    </div>
+
+    <script>
+        const TOTAL_ROWS = 200;
+        const container = document.getElementById('rows-container');
+        const refreshButton = document.getElementById('refresh-button');
+        const undoButton = document.getElementById('undo-button');
+        const starCountDisplay = document.getElementById('star-count');
+        const refreshSound = document.getElementById('refresh-sound');
+        const clickSound = document.getElementById('click-sound');
+
+        function createRow(index) {
+            const row = document.createElement('div');
+            row.className = 'row';
+            row.innerHTML = `
+                <input type="text" placeholder="Title" data-index="${index}" value="${getLocalStorageValue('title_' + index)}">
+                <input type="number" class="dayz" placeholder="--" data-index="${index}" value="${getLocalStorageValue('dayz_' + index)}">
+                <div class="middle-column" data-index="${index}"></div>
+                <input type="number" class="value" data-index="${index}" value="${getLocalStorageValue('value_' + index) || 'NaN'}">
+                <input type="number" class="add" data-index="${index}" placeholder="+">
+            `;
+            container.appendChild(row);
+
+            const valueInput = row.querySelector('.value');
+            const addInput = row.querySelector('.add');
+            const dayzInput = row.querySelector('.dayz');
+
+            valueInput.addEventListener('focus', function () {
+                const value = valueInput.value;
+                const decimalIndex = value.indexOf('.');
+                if (decimalIndex !== -1) {
+                    valueInput.setSelectionRange(0, decimalIndex);
+                } else {
+                    valueInput.select();
+                }
+            });
+
+            valueInput.addEventListener('blur', function() {
+                let newValue = valueInput.value === '' ? NaN : parseFloat(valueInput.value);
+                overwriteValue(index, newValue);
+            });
+
+            row.querySelector('input[type="text"]').addEventListener('input', function() {
+                saveToLocalStorage('title_' + index, this.value);
+            });
+            
+            row.querySelector('input[type="text"]').addEventListener('blur', function() {
+                const blipSound = document.getElementById('blip-sound'); blipSound.volume = 0.6;
+                blipSound.currentTime = 0;  blipSound.play();
+            });
+            
+            dayzInput.addEventListener('input', function() {
+                saveToLocalStorage('dayz_' + index, this.value);
+            });
+
+            addInput.addEventListener('focus', function () {
+                let dayzValue = dayzInput.value.trim(); // Get "dayz" value
+                if (dayzValue !== '') {
+                    addInput.value = dayzValue; // Autofill
+                }
+                    addInput.select(); // Auto-select text
+            });
+
+            addInput.addEventListener('blur', function () {
+                let addValue = parseFloat(addInput.value);
+                if (!isNaN(addValue)) {
+                    let currentValue = parseFloat(valueInput.value) || 0;
+                    overwriteValue(index, currentValue + addValue);
+                }
+                addInput.value = ''; // Clear add input after use
+                clickSound.currentTime = 0; clickSound.play();
+            });
+
+            updateMiddleColumn(index);
+            updateStarCount();
+        }
+
+        function overwriteValue(index, newValue) {
+            const valueInput = document.querySelector(`.value[data-index="${index}"]`);
+            valueInput.value = isNaN(newValue) ? 'NaN' : newValue.toFixed(2);
+            saveToLocalStorage('value_' + index, valueInput.value);
+            updateMiddleColumn(index);
+            updateStarCount();
+            sortRows();
+        }
+
+        function updateMiddleColumn(index) {
+            const rightValue = parseFloat(document.querySelector(`.value[data-index="${index}"]`).value);
+            const middleColumn = document.querySelector(`.middle-column[data-index="${index}"]`);
+            middleColumn.textContent = isNaN(rightValue) || rightValue > 0.99 ? '' : '***';
+        }
+
+        function updateStarCount() {
+            const starCount = Array.from(document.querySelectorAll('.middle-column'))
+                .filter(el => el.textContent === '***').length;
+            starCountDisplay.textContent = `*** ${starCount}`;
+        }
+
+        function sortRows() {
+            const rows = Array.from(container.getElementsByClassName('row'));
+            rows.sort((a, b) => {
+                const valueA = parseFloat(a.querySelector('.value').value);
+                const valueB = parseFloat(b.querySelector('.value').value);
+                return (isNaN(valueA) ? Infinity : valueA) - (isNaN(valueB) ? Infinity : valueB);
+            });
+            rows.forEach((row, i) => {
+                container.appendChild(row);
+                const middleColumn = row.querySelector('.middle-column');
+                const rightValue = parseFloat(row.querySelector('.value').value);
+                middleColumn.textContent = isNaN(rightValue) || rightValue > 1.99 ? i + 1 : (rightValue >= 1 && rightValue < 2 ? '__' : '***');
+            });
+            updateStarCount();
+        }
+
+        function decrementAllValues() {
+            const valueInputs = document.querySelectorAll('.value');
+            valueInputs.forEach(input => {
+                let currentValue = parseFloat(input.value);
+                if (!isNaN(currentValue)) {
+                    input.value = (currentValue - 1).toFixed(2);
+                    saveToLocalStorage('value_' + input.dataset.index, input.value);
+                }
+            });
+
+            sortRows();
+            updateStarCount();
+            refreshSound.currentTime = 0; refreshSound.play();
+        }
+    
+        function incrementAllValues() {
+            const valueInputs = document.querySelectorAll('.value');
+            valueInputs.forEach(input => {
+                let currentValue = parseFloat(input.value);
+                if (!isNaN(currentValue)) {
+                    input.value = (currentValue + 1).toFixed(2);
+                    saveToLocalStorage('value_' + input.dataset.index, input.value);
+                }
+            });
+
+            sortRows();
+            updateStarCount();
+            refreshSound.currentTime = 0; refreshSound.play();
+        }
+
+        function saveToLocalStorage(key, value) {
+            localStorage.setItem(key, value);
+        }
+
+        function getLocalStorageValue(key) {
+            return localStorage.getItem(key) || '';
+        }
+
+        refreshButton.addEventListener('click', decrementAllValues);
+        undoButton.addEventListener('click', incrementAllValues);
+
+        for (let i = 0; i < TOTAL_ROWS; i++) {
+            createRow(i);
+        }
+
+        sortRows();
+    </script>
+</body>
+</html>
