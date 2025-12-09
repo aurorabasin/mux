@@ -1,0 +1,141 @@
+<!DOCTYPE html><html lang="en">
+
+<head>  
+<link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@300;400;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8" />  
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />  
+<title>🏹</title>  
+<style>  
+  body{background:#1a1a1a;color:#d5d5d5;font-family:sans-serif;margin:0;padding:0;}  
+  header{display:flex;justify-content:space-between;align-items:center;padding:12px;background:#222;border-bottom:1px solid #333;}  
+  .row{display:grid;grid-template-columns:1fr 80px 100px 30px;gap:8px;align-items:center;padding:10px;background:#2a2a2a;margin:10px;border-radius:6px;}  
+  input{background:#333;color:#eee;border:1px solid #444;padding:5px;border-radius:4px;width:100%;}  
+  button{background:#444;color:#fff;border:none;padding:6px 10px;border-radius:4px;}  
+  button:hover{background:#555;}  
+  .ranges{display:grid;grid-template-columns:20px 80px 20px 80px;gap:8px;align-items:center;margin:10px;}  
+  .ranges span {color: #777;   /* dimmer gray */ }  
+  .ranges input {color: #9a958e;        /* your new text color */}
+  .display {
+  font-size: 0.9rem;        /* smaller text */
+  color: #7c8796;           /* dark gray-blue */
+  font-family: "Inconsolata", monospace;
+  }
+</style>  
+</head>  
+<body>  <header>  
+  <div>🏹</div>  
+  <div>  
+    <button id="resetBtn">reset</button>  
+    <span id="topStatus">•</span>  
+  </div>  
+</header>  <div id="line1" class="row">  
+  <input class="title" />  
+  <input class="adder" type="number" step="any" />  
+  <div class="display"></div>  
+  <div class="status">•</div>  
+</div>  <div id="line2" class="row">  
+  <input class="title" />  
+  <input class="adder" type="number" step="any" />  
+  <div class="display"></div>  
+  <div class="status">•</div>  
+</div>  <div class="ranges">  
+  <span>ᴿ</span><input id="rMin" type="number" step="any">  
+  <span>-</span><input id="rMax" type="number" step="any">  
+</div>  
+<div class="ranges">  
+  <span>ƒ</span><input id="fMin" type="number" step="any">  
+  <span>-</span><input id="fMax" type="number" step="any">  
+</div>  <audio id="sndAdd" src="check.mp3"></audio>
+<audio id="sndReset" src="reset.mp3"></audio>
+<audio id="sndAll" src="allchecked.mp3"></audio>
+
+<script>  
+sndAll.volume = 0.8;  
+  
+function loadData(){  
+  return JSON.parse(localStorage.getItem("archeryV2")||"{}");  
+}  
+function saveData(d){  
+  localStorage.setItem("archeryV2",JSON.stringify(d));  
+}  
+function updateUI(d){  
+  ["line1","line2"].forEach(id=>{  
+    let L=d[id];  
+    const row=document.getElementById(id);  
+    row.querySelector(".title").value=L.title;  
+    row.querySelector(".display").textContent= (L.current-L.target)+"/"+L.target;  
+    row.querySelector(".status").textContent = L.current>=L.target ? "✅" : "•";  
+  });  
+  ["rMin","rMax","fMin","fMax"].forEach(id=>{  
+    document.getElementById(id).value=d[id];  
+  });  
+  updateTop(d);  
+}  
+function updateTop(d){  
+  const done1=d.line1.current>=d.line1.target;  
+  const done2=d.line2.current>=d.line2.target;  
+  const top=document.getElementById("topStatus");  
+  if(done1 && done2){  
+    if(top.textContent!=="✅"){  
+      sndAll.currentTime=0; sndAll.play();  
+    }  
+    top.textContent="✅";  
+  } else top.textContent="•";  
+}  
+  
+let data = loadData();  
+if(!data.line1){ data={  
+  line1:{title:"",current:0,target:1},  
+  line2:{title:"",current:0,target:1},  
+  rMin:1,rMax:2,fMin:1,fMax:2  
+};}  
+updateUI(data);  
+  
+// title save  
+document.querySelectorAll(".title").forEach((t,i)=>{  
+  t.onblur=()=>{  
+    data["line"+(i+1)].title=t.value;  
+    saveData(data);  
+  };  
+});  
+  
+// adder logic  
+document.querySelectorAll(".adder").forEach((a,i)=>{  
+  a.onblur=()=>{  
+    const val=parseFloat(a.value)||0;  
+    if(val!==0){  
+      sndAdd.currentTime=0; sndAdd.play();  
+      let L=data["line"+(i+1)];  
+      L.current+=val;  
+      a.value="";  
+      updateUI(data);  
+      saveData(data);  
+    } else a.value="";  
+  };  
+});  
+  
+// range inputs save  
+["rMin","rMax","fMin","fMax"].forEach(id=>{  
+  document.getElementById(id).onblur=()=>{  
+    data[id]=parseFloat(document.getElementById(id).value)||0;  
+    saveData(data);  
+  };  
+});  
+  
+// reset  
+document.getElementById("resetBtn").onclick=()=>{  
+  sndReset.currentTime=0; sndReset.play();  
+  
+  let r = Math.round(data.rMin + Math.random()*(data.rMax-data.rMin));  
+  let f = data.fMin + Math.random()*(data.fMax-data.fMin);  
+  
+  data.line1.current=0;  
+  data.line1.target=r;  
+  
+  data.line2.current=0;  
+  data.line2.target=Math.round(r*f);  
+  
+  updateUI(data);  
+  saveData(data);  
+};  
+</script>  </body></html>
